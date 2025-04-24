@@ -4,38 +4,48 @@
 
 ---
 
-## 1. What is this?
+## 1. What is this?
 
-A FastAPI web service that:
+A full-stack application that:
 
 1. Accepts an image upload from the user.
 2. (Right now) always classifies it as "pizza" with fixed macros (mocked for testing).
 3. Returns fake calories, protein, carbs & fats.
 4. Includes a GPT‑style summary blurb (also mocked).
 
-> **What's working now:** File upload to FastAPI is functional via Swagger UI (`/docs`).
+> **What's working now:** File upload to FastAPI is functional via Swagger UI (`/docs`) and through the React frontend.
 > You can test the endpoint with any image to simulate a full recognition + nutrition result.
 
 ---
 
-## 2. Project structure
+## 2. Project structure
 
 ```text
-├─ api/                  # FastAPI service (mock working now)
-│  ├─ main.py            # /analyze route
-│  ├─ food_lookup.py     # mocked macros (returns pizza)
-│  └─ prompts.py         # mocked GPT blurb
-├─ data/
-│  └─ usda_food.csv      # (not used yet)
-├─ .env.sample           # API keys (Google, OpenAI)
-├─ .gitignore
-├─ requirements.txt      # Python deps
-└─ README.md             # you are here
+├─ photo-to-macros/        # Main project directory
+│  ├─ api/                 # FastAPI service (mock working now)
+│  │  ├─ main.py           # /analyze route
+│  │  ├─ food_lookup.py    # mocked macros (returns pizza)
+│  │  └─ prompts.py        # mocked GPT blurb
+│  ├─ data/
+│  │  └─ usda_food.csv     # (not used yet)
+│  ├─ frontend/            # React frontend (NomLog UI)
+│  │  ├─ src/              # React source code
+│  │  │  ├─ components/    # UI components
+│  │  │  ├─ pages/         # Application pages
+│  │  │  └─ utils/         # Utilities
+│  │  ├─ public/           # Public assets
+│  │  ├─ index.html        # HTML template
+│  │  └─ package.json      # Frontend dependencies
+│  ├─ .env.sample          # API keys (Google, OpenAI)
+│  ├─ .gitignore
+│  └─ requirements.txt     # Python dependencies
+├─ .venv/                  # Python virtual environment
+└─ README.md               # you are here
 ```
 
 ---
 
-## 3. Quick‑start (local)
+## 3. Quick‑start (local)
 
 ```bash
 # 1. Clone & enter
@@ -46,18 +56,25 @@ $ cd photo-macro-estimator
 $ python -m venv .venv
 $ .venv\Scripts\activate
 
-# 3. Install requirements
-$ pip install -r requirements.txt
+# 3. Install backend requirements
+$ pip install -r photo-to-macros/requirements.txt
 
 # 4. Run FastAPI server
-$ uvicorn api.main:app --reload
+$ uvicorn photo-to-macros.api.main:app --reload
+
+# 5. In a new terminal, install and run the frontend
+$ cd photo-to-macros/frontend
+$ npm install
+$ npm run dev
 ```
 
-Visit: [http://localhost:8000/docs](http://localhost:8000/docs) → upload an image and get a mocked prediction.
+Visit:
+- Backend API: [http://localhost:8000/docs](http://localhost:8000/docs)
+- Frontend: [http://localhost:5173](http://localhost:5173)
 
 ---
 
-## 4. Key endpoints
+## 4. Key endpoints
 
 | Method | Route                | Purpose                                                                 |
 | ------ | -------------------- | ----------------------------------------------------------------------- |
@@ -65,16 +82,16 @@ Visit: [http://localhost:8000/docs](http://localhost:8000/docs) → upload an im
 
 ---
 
-## 5. What’s coming next?
+## 5. What's coming next?
 
 - 🔄 Replace mock label with real **Google Cloud Vision API** response
 - 📊 Replace fake macros with **USDA CSV** lookup
 - 🤖 Replace fake GPT summary with **real GPT-4 API** call
-- 🌐 Add frontend (NomLog UI) to hit this `/analyze` endpoint
+- 📱 Mobile-responsive improvements to the frontend
 
 ---
 
-## 6. AI techniques used 🚀
+## 6. AI techniques used 🚀
 
 | Course topic                 | Where it appears                                     |
 | ---------------------------- | ---------------------------------------------------- |
@@ -84,7 +101,7 @@ Visit: [http://localhost:8000/docs](http://localhost:8000/docs) → upload an im
 
 ---
 
-## 7. License
+## 7. License
 
-MIT © 2025 Josh Howard
+MIT © 2025 Josh Howard
 
