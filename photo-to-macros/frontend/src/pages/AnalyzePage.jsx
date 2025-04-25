@@ -30,7 +30,15 @@ const AnalyzePage = () => {
     try {
       // Call the API service to analyze the image
       const analysisResults = await analyzeFoodImage(selectedImage);
-      setResults(analysisResults);
+      
+      // Create an image URL to display the uploaded image
+      const imageUrl = URL.createObjectURL(selectedImage);
+      
+      // Add the image URL to the results
+      setResults({
+        ...analysisResults,
+        imageUrl: imageUrl
+      });
       
       // If there's an error message in the response, display it
       if (analysisResults && analysisResults.success === false && analysisResults.error) {

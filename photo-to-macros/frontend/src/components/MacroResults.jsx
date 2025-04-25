@@ -1,7 +1,8 @@
-import { FaFire, FaLeaf, FaBreadSlice, FaOilCan } from 'react-icons/fa';
+import { FaFire, FaLeaf, FaBreadSlice, FaOilCan, FaPlus } from 'react-icons/fa';
+import { useState } from 'react';
 
 /**
- * Component to display macro nutritional results
+ * Component to display macro nutritional results in a detailed food log format
  * 
  * @param {Object} props - Component props
  * @param {Object} props.results - The macro results from the API
@@ -73,92 +74,198 @@ const MacroResults = ({ results }) => {
     );
   }
   
-  // Now we know macros is a valid object
-  // Map of macro nutrients to their icons and colors
-  const macroDetails = [
-    { 
-      name: 'Calories', 
-      value: macros.calories || 0, 
-      unit: 'kcal', 
-      icon: FaFire, 
-      color: 'text-orange-500',
-      bgColor: 'bg-orange-50',
-    },
-    { 
-      name: 'Protein', 
-      value: macros.protein || 0, 
-      unit: 'g', 
-      icon: FaLeaf, 
-      color: 'text-green-500',
-      bgColor: 'bg-green-50',
-    },
-    { 
-      name: 'Carbs', 
-      value: macros.carbs || 0, 
-      unit: 'g', 
-      icon: FaBreadSlice, 
-      color: 'text-yellow-500',
-      bgColor: 'bg-yellow-50',
-    },
-    { 
-      name: 'Fat', 
-      value: macros.fat || 0, 
-      unit: 'g', 
-      icon: FaOilCan, 
-      color: 'text-red-500',
-      bgColor: 'bg-red-50',
-    },
-  ];
+  // Simulated additional items - in a real app, these would come from the API
+  // This is to demonstrate the breakdown section as shown in the mockup
+  const foodComponents = [];
+  
+  // If the food is a compound food (like in the mockup), add components
+  if (food === 'hamburger' || food === 'cheeseburger') {
+    foodComponents.push({
+      name: 'Cheeseburger',
+      calories: 550,
+      protein: 25,
+      carbs: 39,
+      fat: 29
+    });
+    
+    foodComponents.push({
+      name: 'French Fries',
+      calories: 350,
+      protein: 9,
+      carbs: 42,
+      fat: 16
+    });
+  }
+  
+  // Handle quantity-based items (like "3 tacos")
+  if (macros.quantity && macros.quantity > 1 && macros.base_item) {
+    const baseCalories = Math.round(macros.calories / macros.quantity);
+    const baseProtein = Math.round((macros.protein / macros.quantity) * 10) / 10;
+    const baseCarbs = Math.round((macros.carbs / macros.quantity) * 10) / 10;
+    const baseFat = Math.round((macros.fat / macros.quantity) * 10) / 10;
+    
+    // Add each individual item to the breakdown
+    for (let i = 0; i < macros.quantity; i++) {
+      foodComponents.push({
+        name: `${macros.base_item.charAt(0).toUpperCase() + macros.base_item.slice(1)} ${i+1}`,
+        calories: baseCalories,
+        protein: baseProtein,
+        carbs: baseCarbs,
+        fat: baseFat
+      });
+    }
+  }
+  
+  // For displaying the macros summary
+  const caloriesValue = macros.calories || 0;
+  const proteinValue = macros.protein || 0;
+  const carbsValue = macros.carbs || 0;
+  const fatValue = macros.fat || 0;
+  
+  // Format the food name for display
+  const formattedFoodName = food.charAt(0).toUpperCase() + food.slice(1);
+  
+  // Check if we have a detailed food name with quantity
+  const isQuantityDescription = /^\d+\s+\w+s$/.test(food); // matches "3 tacos"
+  const getDisplayName = () => {
+    // Special case for multiple items
+    if (isQuantityDescription) {
+      return formattedFoodName; // Already properly formatted like "3 tacos"
+    }
+    
+    // For compound foods
+    if (food === 'hamburger' || food === 'cheeseburger') {
+      return 'Cheeseburger with French Fries';
+    }
+    
+    // For all other foods
+    return formattedFoodName;
+  };
+  
+  const displayName = getDisplayName();
   
   return (
-    <div className="bg-white border border-gray-100 rounded-md overflow-hidden animate-fade-in shadow-sm">
-      {/* Food name header */}
-      <div className="p-5 border-b border-gray-100 bg-white">
-        <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-display font-light tracking-tight text-gray-900 m-0">
-            {food}
-          </h2>
-          <div className="badge badge-primary">
-            Identified
+    <div className="space-y-4">
+      {/* Today's Summary Card */}
+      <div className="bg-white border border-gray-100 rounded-md overflow-hidden animate-fade-in shadow-sm">
+        <div className="p-4">
+          <h2 className="text-xl font-bold mb-4">Today's Summary</h2>
+          
+          <div className="grid grid-cols-4 gap-4 text-center">
+            <div>
+              <div className="text-2xl font-bold text-blue-500">{caloriesValue}</div>
+              <div className="text-sm text-gray-500">Calories</div>
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-red-500">{proteinValue}g</div>
+              <div className="text-sm text-gray-500">Protein</div>
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-green-500">{carbsValue}g</div>
+              <div className="text-sm text-gray-500">Carbs</div>
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-yellow-500">{fatValue}g</div>
+              <div className="text-sm text-gray-500">Fats</div>
+            </div>
           </div>
         </div>
       </div>
       
-      <div className="p-6 space-y-8">
-        {/* GPT Summary */}
-        <div className="bg-gray-50 p-5 rounded-md animate-fade-in">
-          <p className="prose text-base italic">
-            {food && `${food.charAt(0).toUpperCase() + food.slice(1)} contains approximately ${macros.calories || 0} calories per 100g serving.`}
-          </p>
-        </div>
-        
-        {/* Macro grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-5">
-          {macroDetails.map((macro, index) => (
-            <div 
-              key={macro.name} 
-              className={`${macro.bgColor} rounded-md p-4 animate-fade-in`}
-              style={{ animationDelay: `${0.1 * index}s` }}
-            >
-              <div className="flex items-center gap-2 mb-2">
-                <macro.icon className={`${macro.color}`} />
-                <span className="text-gray-700 font-medium text-sm">{macro.name}</span>
-              </div>
-              <div className="text-3xl font-display font-light tracking-tight">
-                {macro.value}
-                <span className="text-xs font-sans font-normal text-gray-500 ml-1">{macro.unit}</span>
-              </div>
+      {/* Detected Food Card */}
+      <div className="bg-white border border-gray-100 rounded-md overflow-hidden animate-fade-in shadow-sm">
+        <div className="p-4">
+          <h2 className="text-xl font-bold mb-4">Detected Food</h2>
+          
+          <div className="flex gap-4">
+            <div className="w-24 h-24 bg-gray-100 rounded-md overflow-hidden">
+              {/* Display the uploaded image if available */}
+              {results.imageUrl ? (
+                <img 
+                  src={results.imageUrl} 
+                  alt={formattedFoodName}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-gray-200">
+                  <FaFire className="text-gray-400 text-3xl" />
+                </div>
+              )}
             </div>
-          ))}
-        </div>
-        
-        {/* Footnote */}
-        <div className="text-center pt-2">
-          <p className="caption">
-            Nutritional information is an estimate based on our database.
-          </p>
+            <div className="flex-1">
+              <h3 className="text-lg font-bold">{displayName}</h3>
+              
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Calories:</span>
+                  <span className="font-medium">{caloriesValue}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Protein:</span>
+                  <span className="font-medium">{proteinValue}g</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Carbs:</span>
+                  <span className="font-medium">{carbsValue}g</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Fats:</span>
+                  <span className="font-medium">{fatValue}g</span>
+                </div>
+              </div>
+              
+              {foodComponents.length > 0 && (
+                <div className="mt-4">
+                  <h4 className="text-md font-semibold mb-2">Breakdown:</h4>
+                  
+                  {foodComponents.map((item, index) => (
+                    <div key={index} className="mb-2">
+                      <div className="font-medium">{item.name}</div>
+                      <div className="text-sm text-gray-600">
+                        {item.calories} cal • P: {item.protein}g • C: {item.carbs}g • F: {item.fat}g
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+          
+          {/* Meal logging buttons */}
+          <div className="grid grid-cols-2 gap-2 mt-4">
+            <button className="btn btn-primary py-2">
+              Add to Breakfast
+            </button>
+            <button className="btn btn-primary py-2">
+              Add to Lunch
+            </button>
+            <button className="btn btn-primary py-2">
+              Add to Dinner
+            </button>
+            <button className="btn btn-primary py-2">
+              Add to Snacks
+            </button>
+          </div>
         </div>
       </div>
+      
+      {/* Meal sections */}
+      {['Breakfast', 'Lunch', 'Dinner', 'Snacks'].map((meal) => (
+        <div key={meal} className="bg-white border border-gray-100 rounded-md overflow-hidden animate-fade-in shadow-sm">
+          <div className="p-4">
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-bold">{meal}</h2>
+              <button className="text-primary-500">
+                <FaPlus />
+              </button>
+            </div>
+            
+            <div className="py-8 text-center text-gray-400">
+              No items logged yet
+            </div>
+          </div>
+        </div>
+      ))}
     </div>
   );
 };

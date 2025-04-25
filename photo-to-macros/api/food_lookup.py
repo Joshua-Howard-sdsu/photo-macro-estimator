@@ -1,8 +1,23 @@
+import re
+
 def get_macros_from_label(label):
     """
     Get macronutrient information for a given food label.
     Values are per 100g of food.
     """
+    # Extract quantities from labels like "3 tacos"
+    quantity = 1
+    base_label = label.lower()
+    
+    # Check for quantity pattern like "3 tacos"
+    quantity_match = re.match(r'^(\d+)\s+(\w+)s?$', label.lower())
+    if quantity_match:
+        quantity = int(quantity_match.group(1))
+        base_label = quantity_match.group(2)
+        # Remove trailing 's' if it exists
+        if base_label.endswith('s') and len(base_label) > 1:
+            base_label = base_label[:-1]
+    
     # If the label contains any of these words, use the first match
     compound_foods = {
         "pizza": ["pizza", "pepperoni", "cheese pizza", "slice"],
@@ -20,15 +35,19 @@ def get_macros_from_label(label):
         "ice cream": ["ice cream", "gelato", "frozen yogurt"],
         "fish": ["fish", "salmon", "tuna", "tilapia", "cod"],
         "french fries": ["fries", "french fries", "chips", "potato wedges"],
-        "taco": ["taco", "burrito", "enchilada", "quesadilla"],
+        "taco": ["taco", "tacos", "soft taco", "hard taco", "street taco"],
         "sushi": ["sushi", "maki", "nigiri", "sashimi"],
     }
     
     # Check if label matches any compound food keywords
+    matched_key = None
     for food_key, keywords in compound_foods.items():
-        if any(keyword in label.lower() for keyword in keywords):
-            label = food_key
+        if any(keyword in base_label for keyword in keywords):
+            matched_key = food_key
             break
+    
+    # Use the matched key or the original base label
+    lookup_label = matched_key if matched_key else base_label
     
     # Database of common foods with their macronutrients
     food_data = {
@@ -89,5 +108,18 @@ def get_macros_from_label(label):
         "chocolate": {"calories": 546, "protein": 7.8, "carbs": 61, "fat": 31},
     }
     
-    # Return macros for label if available, or empty dict if not found
-    return food_data.get(label.lower(), {})
+    # Get the base macros
+    base_macros = food_data.get(lookup_label.lower(), {})
+    
+    # If we found macros and have a quantity > 1, multiply the values
+    if base_macros and quantity > 1:
+        return {
+            "calories": base_macros.get("calories", 0) * quantity,
+            "protein": base_macros.get("protein", 0) * quantity,
+            "carbs": base_macros.get("carbs", 0) * quantity,
+            "fat": base_macros.get("fat", 0) * quantity,
+            "quantity": quantity,
+            "base_item": lookup_label
+        }
+    
+    return base_macros

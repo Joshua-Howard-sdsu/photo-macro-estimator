@@ -156,12 +156,24 @@ def detect_food_labels(image_bytes) -> List[str]:
         objects = object_response.localized_object_annotations
         object_labels = [obj.name.lower() for obj in objects if obj.score > 0.6]
         
+        # Count food objects to determine quantity
+        food_counts = {}
+        for obj in objects:
+            if obj.score > 0.6:
+                name = obj.name.lower()
+                if name in food_counts:
+                    food_counts[name] += 1
+                else:
+                    food_counts[name] = 1
+        
         # Filter for food-related labels
         food_keywords = ["food", "dish", "cuisine", "meal", "fruit", "vegetable", 
                          "meat", "bread", "dessert", "breakfast", "lunch", "dinner",
                          "snack", "beverage", "drink", "sandwich", "salad", "pasta",
-                         "rice", "potato", "burger", "pizza", "cake", "cookie"]
+                         "rice", "potato", "burger", "pizza", "cake", "cookie", "taco"]
         
+        # Process detailed food information
+        detailed_food_labels = []
         food_labels = []
         
         # Add object detection results first (they're usually more specific)
@@ -190,11 +202,74 @@ def detect_food_labels(image_bytes) -> List[str]:
             # Just take the top 3 labels as a fallback
             for label in labels[:3]:
                 food_labels.append(label.description.lower())
+        
+        # Create detailed labels with quantity and descriptors
+        for label in food_labels:
+            if label in food_counts and food_counts[label] > 1:
+                detailed_label = f"{food_counts[label]} {label}s"
+                detailed_food_labels.append(detailed_label)
+            else:
+                # Check for descriptive terms in other labels
+                descriptors = []
+                for desc_label in food_labels:
+                    # Skip the current label and very generic terms
+                    if desc_label != label and desc_label not in ["food", "dish", "meal"]:
+                        # Check if it could be a descriptor (adjective)
+                        if (desc_label + " " + label) in " ".join(food_labels) or \
+                           any(desc_label in l and label in l for l in food_labels):
+                            descriptors.append(desc_label)
+                
+                if descriptors:
+                    # Combine the main label with relevant descriptors
+                    descriptor_str = " ".join(descriptors[:2])  # Limit to 2 descriptors
+                    detailed_label = f"{descriptor_str} {label}"
+                    detailed_food_labels.append(detailed_label)
+                else:
+                    detailed_food_labels.append(label)
+        
+        # If we have both "taco" and a number (like "3"), combine them
+        if "taco" in food_labels:
+            # Look for numbers in the labels
+            number_words = ["one", "two", "three", "four", "five", "six", "seven", "eight", "nine"]
+            found_number = None
+            
+            # Check for numeric words
+            for label in food_labels:
+                if label in number_words:
+                    found_number = number_words.index(label) + 1
+                    break
+            
+            # Check for numeric digits
+            if not found_number:
+                for label in food_labels:
+                    if label.isdigit() and int(label) > 0 and int(label) < 10:
+                        found_number = int(label)
+                        break
+            
+            if found_number:
+                # Replace generic "taco" with "{number} tacos"
+                detailed_food_labels = [label.replace("taco", f"{found_number} tacos") if "taco" in label else label 
+                                      for label in detailed_food_labels]
+        
+        # Handle special case for tacos
+        if "taco" in " ".join(food_labels).lower() and food_counts.get("taco", 0) > 1:
+            taco_count = food_counts.get("taco", 0)
+            # Replace or add the detailed taco description
+            taco_entry_found = False
+            for i, label in enumerate(detailed_food_labels):
+                if "taco" in label.lower():
+                    detailed_food_labels[i] = f"{taco_count} tacos"
+                    taco_entry_found = True
+                    break
+            
+            if not taco_entry_found:
+                detailed_food_labels.append(f"{taco_count} tacos")
                 
         # Log the detected food labels for debugging
-        print(f"Detected food labels: {food_labels}")
+        print(f"Basic food labels: {food_labels}")
+        print(f"Detailed food labels: {detailed_food_labels}")
                 
-        return food_labels if food_labels else ["unidentified food"]
+        return detailed_food_labels if detailed_food_labels else ["unidentified food"]
         
     except Exception as e:
         print(f"Error in vision API: {e}")

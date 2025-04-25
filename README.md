@@ -49,7 +49,7 @@ A full-stack application that:
 
 ```bash
 # 1. Clone & enter
-$ git clone https://github.com/JCarlosGonzalez98/photo-macro-estimator.git
+$ git clone https://github.com/Joshua-Howard-sdsu/photo-macro-estimator.git
 $ cd photo-macro-estimator
 
 # 2. Set up virtual environment
@@ -84,10 +84,10 @@ Visit:
 
 ## 5. What's coming next?
 
-- 🔄 Replace mock label with real **Google Cloud Vision API** response - Done
+- 🔄 Replace mock label with real **Google Cloud Vision API** response
 - 📊 Replace fake macros with **USDA CSV** lookup
 - 🤖 Replace fake GPT summary with **real GPT-4 API** call
-- 📱 Mobile-responsive improvements to the frontend - Done
+- 📱 Mobile-responsive improvements to the frontend
 
 ---
 

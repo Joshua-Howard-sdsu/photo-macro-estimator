@@ -1,107 +1,117 @@
-# 📸🍽️ Photo‑to‑Meal Macro Estimator
+# Photo to Macros
 
-*A lightweight, API‑first service that turns a food photo into an instant macronutrient log for **NomLog***
+A web application that analyzes food photos to identify the food and provide nutritional information.
 
----
+## Features
 
-## 1. What is this?
+- Upload food photos via drag-and-drop or file selection
+- AI-powered food recognition using Google Cloud Vision API
+- Get nutritional information including calories, protein, carbs, and fat
+- Modern, responsive UI built with React and Tailwind CSS
 
-A full-stack application that:
+## Setup
 
-1. Accepts an image upload from the user.
-2. (Right now) always classifies it as "pizza" with fixed macros (mocked for testing).
-3. Returns fake calories, protein, carbs & fats.
-4. Includes a GPT‑style summary blurb (also mocked).
+### Prerequisites
 
-> **What's working now:** File upload to FastAPI is functional via Swagger UI (`/docs`) and through the React frontend.
-> You can test the endpoint with any image to simulate a full recognition + nutrition result.
+- Python 3.9+ 
+- Node.js 18+
+- Google Cloud account with Vision API enabled
 
----
+### Google Cloud Vision API Setup
 
-## 2. Project structure
+1. Create a Google Cloud account and project at [console.cloud.google.com](https://console.cloud.google.com)
+2. Enable the Vision API for your project:
+   - Go to APIs & Services > Library
+   - Search for "Vision"
+   - Click on "Cloud Vision API"
+   - Click "Enable"
+3. Create a service account:
+   - Go to APIs & Services > Credentials
+   - Click "Create Credentials" > "Service Account"
+   - Enter a name and description
+   - Grant the role "Cloud Vision API User"
+   - Click "Done"
+4. Create and download a service account key:
+   - Find your service account in the list
+   - Click on the service account name
+   - Go to the "Keys" tab
+   - Click "Add Key" > "Create new key"
+   - Choose JSON format
+   - Click "Create" to download the key file
+5. Rename the downloaded file to `GCV_API.json`
+6. Place the file in one of these locations:
+   - Project root directory
+   - `photo-to-macros/credentials/` directory
 
-```text
-├─ photo-to-macros/        # Main project directory
-│  ├─ api/                 # FastAPI service (mock working now)
-│  │  ├─ main.py           # /analyze route
-│  │  ├─ food_lookup.py    # mocked macros (returns pizza)
-│  │  └─ prompts.py        # mocked GPT blurb
-│  ├─ data/
-│  │  └─ usda_food.csv     # (not used yet)
-│  ├─ frontend/            # React frontend (NomLog UI)
-│  │  ├─ src/              # React source code
-│  │  │  ├─ components/    # UI components
-│  │  │  ├─ pages/         # Application pages
-│  │  │  └─ utils/         # Utilities
-│  │  ├─ public/           # Public assets
-│  │  ├─ index.html        # HTML template
-│  │  └─ package.json      # Frontend dependencies
-│  ├─ .env.sample          # API keys (Google, OpenAI)
-│  ├─ .gitignore
-│  └─ requirements.txt     # Python dependencies
-├─ .venv/                  # Python virtual environment
-└─ README.md               # you are here
+### Backend Setup
+
+1. Create a virtual environment:
+   ```
+   python -m venv .venv
+   .venv\Scripts\activate  # Windows
+   source .venv/bin/activate  # macOS/Linux
+   ```
+
+2. Install backend dependencies:
+   ```
+   cd photo-to-macros
+   pip install -r requirements.txt
+   ```
+
+3. Run the backend server:
+   ```
+   python run_api.py
+   ```
+
+### Frontend Setup
+
+1. Install frontend dependencies:
+   ```
+   cd photo-to-macros/frontend
+   npm install
+   ```
+
+2. Start the development server:
+   ```
+   npm run dev
+   ```
+
+3. Open the application in your browser at `http://localhost:5173`
+
+## Troubleshooting
+
+### Google Vision API Credentials Issues
+
+If you encounter errors related to Google Vision API credentials:
+
+1. Make sure your Google Cloud project has:
+   - Vision API enabled
+   - Billing enabled
+   - The service account has proper permissions
+
+2. Try setting the credentials environment variable directly:
+   ```
+   # Windows
+   $env:GOOGLE_APPLICATION_CREDENTIALS="C:\path\to\your\GCV_API.json"
+   
+   # macOS/Linux
+   export GOOGLE_APPLICATION_CREDENTIALS="/path/to/your/GCV_API.json"
+   ```
+
+## Project Structure
+
 ```
-
----
-
-## 3. Quick‑start (local)
-
-```bash
-# 1. Clone & enter
-$ git clone https://github.com/Joshua-Howard-sdsu/photo-macro-estimator.git
-$ cd photo-macro-estimator
-
-# 2. Set up virtual environment
-$ python -m venv .venv
-$ .venv\Scripts\activate
-
-# 3. Install backend requirements
-$ pip install -r photo-to-macros/requirements.txt
-
-# 4. Run FastAPI server
-$ uvicorn photo-to-macros.api.main:app --reload
-
-# 5. In a new terminal, install and run the frontend
-$ cd photo-to-macros/frontend
-$ npm install
-$ npm run dev
+photo-to-macros/
+├── api/                    # Backend API code
+│   ├── main.py             # FastAPI application
+│   ├── food_lookup.py      # Food database and nutritional info
+│   └── prompts.py          # Text generation templates
+├── credentials/            # Place for Google Cloud credentials
+├── frontend/               # React frontend
+│   ├── public/             # Static assets
+│   └── src/                # Source code
+│       ├── components/     # Reusable UI components
+│       ├── pages/          # Application pages/routes
+│       └── utils/          # Utility functions and API client
+└── run_api.py              # API server starter
 ```
-
-Visit:
-- Backend API: [http://localhost:8000/docs](http://localhost:8000/docs)
-- Frontend: [http://localhost:5173](http://localhost:5173)
-
----
-
-## 4. Key endpoints
-
-| Method | Route                | Purpose                                                                 |
-| ------ | -------------------- | ----------------------------------------------------------------------- |
-| `POST` | `/analyze`           | Upload image → get fixed label ("pizza") and fake macros + summary     |
-
----
-
-## 5. What's coming next?
-
-- 🔄 Replace mock label with real **Google Cloud Vision API** response
-- 📊 Replace fake macros with **USDA CSV** lookup
-- 🤖 Replace fake GPT summary with **real GPT-4 API** call
-- 📱 Mobile-responsive improvements to the frontend
-
----
-
-## 6. AI techniques used 🚀
-
-| Course topic                 | Where it appears                                     |
-| ---------------------------- | ---------------------------------------------------- |
-| **Supervised Learning**      | (planned) via Google Vision's food classification     |
-| **Knowledge Representation** | USDA food → macro lookup                             |
-| **LLM prompting**            | GPT summary generation (mocked for now)              |
-
----
-
-## 7. License
-
-MIT © 2025 Josh Howard
-
