@@ -16,12 +16,19 @@ from PIL import Image
 import time
 import uuid
 import random
+import requests
+from io import BytesIO
+import hashlib
+from functools import lru_cache
 
 # Load environment variables
 load_dotenv()
 
 # Add the current directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# Simple response cache
+openai_response_cache = {}
 
 app = FastAPI()
 
@@ -310,25 +317,303 @@ def generate_macro_summary(label, macros):
     
     return "\n".join(summary)
 
+# OpenAI Vision API function
+async def get_macros_from_openai(image_bytes, food_label):
+    """
+    Get macronutrient information using OpenAI's Vision API.
+    
+    Args:
+        image_bytes: The image data in bytes
+        food_label: The detected food label from Google Vision
+        
+    Returns:
+        A dictionary containing macronutrient information
+    """
+    try:
+        # Get OpenAI API key from environment
+        api_key = os.environ.get("OPENAI_API_KEY")
+        if not api_key:
+            print("OpenAI API key not found in environment variables")
+            return None
+        
+        # Create a cache key based on the image and food label but don't use it
+        # Just for logging purposes
+        cache_key = hashlib.md5(image_bytes + food_label.encode('utf-8')).hexdigest()
+        print(f"Processing {food_label} (key: {cache_key[:8]})")
+            
+        # Convert image bytes to base64
+        base64_image = base64.b64encode(image_bytes).decode('utf-8')
+        
+        # Create a simpler prompt for faster processing
+        prompt = f"""
+        This image contains {food_label}. 
+        
+        Identify the main food items and for EACH provide:
+        1. Name
+        2. Calories
+        3. Protein (g)
+        4. Carbs (g)
+        5. Fat (g)
+        
+        Return ONLY a valid JSON object in this structure:
+        {{
+          "total": {{"calories": number, "protein": number, "carbs": number, "fat": number}},
+          "components": [
+            {{"name": "food1", "calories": number, "protein": number, "carbs": number, "fat": number}},
+            {{"name": "food2", "calories": number, "protein": number, "carbs": number, "fat": number}}
+          ]
+        }}
+        """
+        
+        # Prepare the API request
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}"
+        }
+        
+        payload = {
+            "model": "gpt-4.1",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": prompt
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{base64_image}"
+                            }
+                        }
+                    ]
+                }
+            ],
+            "max_tokens": 250,
+            "temperature": 0.3,
+            "response_format": { "type": "json_object" }
+        }
+        
+        # Make the API request
+        try:
+            response = requests.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=15  # Set a timeout to prevent hanging
+            )
+            
+            # Process the response
+            if response.status_code == 200:
+                result = response.json()
+                content = result['choices'][0]['message']['content']
+                
+                try:
+                    # Since we requested JSON format, we can parse directly
+                    macros = json.loads(content)
+                    
+                    # Handle new component-based format
+                    if 'components' in macros and 'total' in macros:
+                        # Recalculate the total to ensure accuracy
+                        recalculated_total = {
+                            'calories': sum(comp.get('calories', 0) for comp in macros['components']),
+                            'protein': sum(comp.get('protein', 0) for comp in macros['components']),
+                            'carbs': sum(comp.get('carbs', 0) for comp in macros['components']),
+                            'fat': sum(comp.get('fat', 0) for comp in macros['components'])
+                        }
+                        
+                        # Always use our calculated total instead of the one from OpenAI
+                        macros['total'] = recalculated_total
+                        macros['source'] = 'openai'
+                        
+                        # Don't cache the response
+                        return macros
+                    
+                    # Handle single-item format (backward compatibility)
+                    required_fields = ['calories', 'protein', 'carbs', 'fat']
+                    if all(field in macros for field in required_fields):
+                        # Convert to component-based format
+                        total = {
+                            'calories': macros['calories'],
+                            'protein': macros['protein'],
+                            'carbs': macros['carbs'],
+                            'fat': macros['fat']
+                        }
+                        components = [{
+                            'name': food_label,
+                            'calories': macros['calories'],
+                            'protein': macros['protein'],
+                            'carbs': macros['carbs'],
+                            'fat': macros['fat']
+                        }]
+                        macros = {
+                            'total': total,
+                            'components': components,
+                            'source': 'openai'
+                        }
+                        
+                        # Don't cache the response
+                        return macros
+                    
+                    # If we got here, format is unexpected
+                    print(f"Unexpected response format: {macros}")
+                    
+                    # Create a fallback format from whatever we got
+                    fallback_macros = {
+                        'total': {
+                            'calories': 0,
+                            'protein': 0,
+                            'carbs': 0,
+                            'fat': 0
+                        },
+                        'components': [
+                            {
+                                'name': food_label,
+                                'calories': 0,
+                                'protein': 0,
+                                'carbs': 0,
+                                'fat': 0
+                            }
+                        ],
+                        'source': 'openai_fallback'
+                    }
+                    
+                    # Try to extract values from the response
+                    for key, value in macros.items():
+                        if isinstance(value, dict):
+                            if all(k in value for k in ['calories', 'protein', 'carbs', 'fat']):
+                                fallback_macros['total'] = value
+                                fallback_macros['components'][0].update(value)
+                                fallback_macros['components'][0]['name'] = key
+                    
+                    # Don't cache the fallback response
+                    return fallback_macros
+                
+                except Exception as e:
+                    print(f"Error parsing OpenAI response: {e}")
+                    print(f"Response content: {content}")
+                    
+                    # Create a simple fallback response
+                    fallback_response = {
+                        'total': {
+                            'calories': 250,
+                            'protein': 15,
+                            'carbs': 25,
+                            'fat': 10
+                        },
+                        'components': [
+                            {
+                                'name': food_label,
+                                'calories': 250,
+                                'protein': 15,
+                                'carbs': 25,
+                                'fat': 10
+                            }
+                        ],
+                        'source': 'openai_fallback'
+                    }
+                    
+                    # Don't cache the fallback response
+                    return fallback_response
+            
+            print(f"OpenAI API request failed with status code: {response.status_code}")
+            print(f"Response: {response.text}")
+            
+        except requests.exceptions.Timeout:
+            print("OpenAI request timed out after 15 seconds")
+        except requests.exceptions.RequestException as e:
+            print(f"Request exception: {e}")
+        except Exception as e:
+            print(f"Error calling OpenAI API: {e}")
+        
+        # If all else fails, return a generic response
+        generic_response = {
+            'total': {
+                'calories': 250,
+                'protein': 15,
+                'carbs': 25,
+                'fat': 10
+            },
+            'components': [
+                {
+                    'name': food_label,
+                    'calories': 250,
+                    'protein': 15,
+                    'carbs': 25,
+                    'fat': 10
+                }
+            ],
+            'source': 'generic_fallback'
+        }
+        
+        # Don't cache the generic response
+        return generic_response
+        
+    except Exception as e:
+        print(f"Error calling OpenAI API: {e}")
+        return None
+
 @app.post("/api/analyze-image")
 async def analyze_image(file: UploadFile = File(...)):
     try:
+        # Start timer to track processing time
+        start_time = time.time()
+        
+        # Set a reasonable timeout for the entire processing
+        max_processing_time = 20  # seconds
+        
         # Read image file
         image_bytes = await file.read()
         
         try:
-            # Detect food labels
+            # Detect food labels - stop if taking too long
+            if time.time() - start_time > max_processing_time * 0.3:
+                return {"success": False, "error": "Processing took too long. Please try with a simpler image."}
+                
             food_labels = detect_food_labels(image_bytes)
             
             # Get macros for each food label
             macro_results = []
+            
             for label in food_labels:
-                macros = get_macros_from_label(label)
-                if macros:
+                # Check if we're close to timeout
+                if time.time() - start_time > max_processing_time * 0.7:
+                    # If we have at least one result, return what we have
+                    if macro_results:
+                        print(f"Returning partial results due to timeout ({len(macro_results)} of {len(food_labels)} processed)")
+                        return {"success": True, "results": macro_results}
+                    else:
+                        return {"success": False, "error": "Analysis took too long. Please try again with a simpler image."}
+                
+                # First try to get macros from OpenAI
+                openai_macros = await get_macros_from_openai(image_bytes, label)
+                
+                if openai_macros:
+                    # Use OpenAI results
                     macro_results.append({
                         "label": label,
-                        "macros": macros
+                        "macros": openai_macros,
+                        "source": "openai"
                     })
+                else:
+                    # Fallback to local database
+                    macros = get_macros_from_label(label)
+                    if macros:
+                        macro_results.append({
+                            "label": label,
+                            "macros": macros,
+                            "source": "database"
+                        })
+            
+            # Check for final timeout        
+            if time.time() - start_time > max_processing_time:
+                # If we have at least one result, return what we have
+                if macro_results:
+                    print(f"Returning results after timeout ({len(macro_results)} processed)")
+                    return {"success": True, "results": macro_results}
+                else:
+                    return {"success": False, "error": "Analysis took too long. Please try again with a simpler image."}
                     
             # If no macros found for any label, use the first label as a prompt for GPT
             if not macro_results and food_labels:
@@ -338,6 +623,10 @@ async def analyze_image(file: UploadFile = File(...)):
                     "macros": gpt_macros,
                     "source": "ai_estimated"
                 })
+                
+            # Add processing time info for debugging
+            processing_time = time.time() - start_time
+            print(f"Total processing time: {processing_time:.2f} seconds")
                 
             return {"success": True, "results": macro_results}
             

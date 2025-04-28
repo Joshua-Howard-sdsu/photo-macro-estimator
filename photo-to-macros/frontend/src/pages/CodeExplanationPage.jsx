@@ -245,6 +245,85 @@ export const analyzeFoodImage = async (imageFile) => {
           </li>
         </ol>
         
+        <h3 className="text-xl font-semibold mb-2">OpenAI API Integration</h3>
+        <p className="mb-4">
+          The application leverages OpenAI's API for detailed nutritional analysis of food images. Here's how it works:
+        </p>
+        
+        <div className="bg-gray-50 p-4 rounded-lg mb-4">
+          <h4 className="font-medium mb-2">Process Flow:</h4>
+          <ol className="list-decimal pl-5 space-y-1">
+            <li>User uploads a food image</li>
+            <li>Google Vision API identifies the food items</li>
+            <li>The identified food is sent to OpenAI's GPT-4.1 model along with the image</li>
+            <li>OpenAI analyzes the image and provides detailed nutritional information for each component</li>
+            <li>The response is processed and displayed to the user</li>
+          </ol>
+        </div>
+        
+        <div className="bg-gray-50 p-4 rounded-lg mb-4">
+          <h4 className="font-medium mb-2">Response Format:</h4>
+          <p className="mb-2">OpenAI returns a structured JSON response with the following format:</p>
+          <pre className="text-xs">
+{`{
+  "total": {
+    "calories": 660,
+    "protein": 36,
+    "carbs": 70,
+    "fat": 24
+  },
+  "components": [
+    {
+      "name": "Street Tacos (3 carne asada/al pastor)",
+      "calories": 450,
+      "protein": 30,
+      "carbs": 45,
+      "fat": 20
+    },
+    {
+      "name": "Salsa (red, small portion)",
+      "calories": 15,
+      "protein": 0,
+      "carbs": 3,
+      "fat": 0
+    },
+    {
+      "name": "Lime Wedge & Garnish",
+      "calories": 5,
+      "protein": 0,
+      "carbs": 1,
+      "fat": 0
+    }
+  ]
+}`}
+          </pre>
+        </div>
+        
+        <p className="mb-4">
+          Key features of the OpenAI integration:
+        </p>
+        <ul className="list-disc pl-5 space-y-1 mb-4">
+          <li><strong>Component-Based Analysis:</strong> For combination meals (like a burger with fries), each food item is analyzed separately</li>
+          <li><strong>Portion Estimation:</strong> Calorie and macronutrient values are estimated based on visible portion sizes</li>
+          <li><strong>Error Handling:</strong> Robust fallback mechanisms ensure users always get a response</li>
+          <li><strong>JSON Response Format:</strong> Structured data format for consistent frontend rendering</li>
+          <li><strong>Request Optimization:</strong> Efficient prompting and timeout handling ensure fast responses</li>
+        </ul>
+        
+        <div className="bg-gray-50 p-4 rounded-lg mb-4">
+          <h4 className="font-medium mb-2">Setup Instructions:</h4>
+          <ol className="list-decimal pl-5 space-y-1">
+            <li>Create an OpenAI account at <a href="https://platform.openai.com" className="text-primary-500 hover:underline">platform.openai.com</a></li>
+            <li>Generate an API key in your OpenAI dashboard</li>
+            <li>Set the API key as an environment variable:
+              <pre className="text-xs bg-gray-100 p-2 mt-1 rounded">
+                OPENAI_API_KEY=your_api_key_here
+              </pre>
+            </li>
+            <li>The application uses the GPT-4.1 model with vision capabilities</li>
+          </ol>
+        </div>
+        
         <h3 className="text-xl font-semibold mb-2">Running the API Server</h3>
         <p className="mb-4">
           Running the API server is simple:
