@@ -18,7 +18,9 @@ import uuid
 import random
 
 # Load environment variables
+dotenv_path = os.path.join(os.path.dirname(__file__), '..', '.env')
 load_dotenv()
+print("USDA_API_KEY loaded:", os.getenv("USDA_API_KEY"))
 
 # Add the current directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -125,38 +127,36 @@ def get_vision_client():
         print(f"Error initializing Vision client: {e}")
         return None
 
+GENERIC_LABELS = {
+    "ingredient", "food", "produce", "close-up", "natural foods", "recipe", "dish", "meal", "cuisine", "superfood", "scampi", "noodle"
+}
+
+def filter_candidates(candidates):
+    # Only keep candidates that are not generic and are likely to be meals (at least 2 words or a known dish)
+    return [
+        c for c in candidates
+        if c["label"] not in GENERIC_LABELS and (len(c["label"].split()) > 1 or c["label"] in ["pad thai", "shrimp pad thai", "spaghetti", "ramen", "cheeseburger", "hamburger", "pizza", "taco", "burrito", "fried rice", "chicken curry", "beef stew", "caesar salad", "egg fried rice"])
+    ]
+
 # Detect food labels in image
-def detect_food_labels(image_bytes) -> List[str]:
+def detect_food_labels(image_bytes):
     """
     Detect food items in an image using Google Cloud Vision API.
     
-    Args:
-        image_bytes: The image data in bytes
-        
     Returns:
-        A list of detected food labels
+        A tuple: (detailed_food_labels, candidates) where candidates is a list of dicts with label and confidence
     """
     client = get_vision_client()
     if not client:
-        # Log error and return empty list instead of mock data
         print("Failed to initialize Vision client. Cannot detect food.")
         raise Exception("Vision API is not properly configured. Check your Google Cloud credentials.")
-    
     try:
         image = vision.Image(content=image_bytes)
-        
-        # Get both label and object annotations for better food detection
         label_response = client.label_detection(image=image, max_results=20)
         object_response = client.object_localization(image=image, max_results=10)
-        
-        # Process label annotations
         labels = label_response.label_annotations
-        
-        # Process object annotations
         objects = object_response.localized_object_annotations
         object_labels = [obj.name.lower() for obj in objects if obj.score > 0.6]
-        
-        # Count food objects to determine quantity
         food_counts = {}
         for obj in objects:
             if obj.score > 0.6:
@@ -165,115 +165,74 @@ def detect_food_labels(image_bytes) -> List[str]:
                     food_counts[name] += 1
                 else:
                     food_counts[name] = 1
-        
-        # Filter for food-related labels
-        food_keywords = ["food", "dish", "cuisine", "meal", "fruit", "vegetable", 
-                         "meat", "bread", "dessert", "breakfast", "lunch", "dinner",
-                         "snack", "beverage", "drink", "sandwich", "salad", "pasta",
-                         "rice", "potato", "burger", "pizza", "cake", "cookie", "taco"]
-        
-        # Process detailed food information
+        food_keywords = ["food", "dish", "cuisine", "meal", "fruit", "vegetable", "meat", "bread", "dessert", "breakfast", "lunch", "dinner", "snack", "beverage", "drink", "sandwich", "salad", "pasta", "rice", "potato", "burger", "pizza", "cake", "cookie", "taco"]
         detailed_food_labels = []
         food_labels = []
-        
-        # Add object detection results first (they're usually more specific)
         food_labels.extend(object_labels)
-        
-        # Then add label detection results with high confidence
         for label in labels:
             if label.score > 0.7 and label.description.lower() not in food_labels:
                 food_labels.append(label.description.lower())
-        
-        # Look for food category indicators
-        if any(keyword in ' '.join(food_labels).lower() for keyword in food_keywords):
-            # Good, we've already identified some food items
-            pass
-        else:
-            # If we haven't found clear food items, look for food categories
+        if not any(keyword in ' '.join(food_labels).lower() for keyword in food_keywords):
             for label in labels:
                 if any(keyword in label.description.lower() for keyword in food_keywords) and label.score > 0.6:
-                    # If it's a food category, add all related labels with decent confidence
                     for sub_label in labels:
                         if sub_label.score > 0.65 and sub_label.description.lower() not in food_labels:
                             food_labels.append(sub_label.description.lower())
-        
-        # If no food items detected with high confidence, include top labels
         if not food_labels and labels:
-            # Just take the top 3 labels as a fallback
             for label in labels[:3]:
                 food_labels.append(label.description.lower())
-        
-        # Create detailed labels with quantity and descriptors
         for label in food_labels:
             if label in food_counts and food_counts[label] > 1:
                 detailed_label = f"{food_counts[label]} {label}s"
                 detailed_food_labels.append(detailed_label)
             else:
-                # Check for descriptive terms in other labels
                 descriptors = []
                 for desc_label in food_labels:
-                    # Skip the current label and very generic terms
                     if desc_label != label and desc_label not in ["food", "dish", "meal"]:
-                        # Check if it could be a descriptor (adjective)
-                        if (desc_label + " " + label) in " ".join(food_labels) or \
-                           any(desc_label in l and label in l for l in food_labels):
+                        if (desc_label + " " + label) in " ".join(food_labels) or any(desc_label in l and label in l for l in food_labels):
                             descriptors.append(desc_label)
-                
                 if descriptors:
-                    # Combine the main label with relevant descriptors
-                    descriptor_str = " ".join(descriptors[:2])  # Limit to 2 descriptors
+                    descriptor_str = " ".join(descriptors[:2])
                     detailed_label = f"{descriptor_str} {label}"
                     detailed_food_labels.append(detailed_label)
                 else:
                     detailed_food_labels.append(label)
-        
-        # If we have both "taco" and a number (like "3"), combine them
         if "taco" in food_labels:
-            # Look for numbers in the labels
             number_words = ["one", "two", "three", "four", "five", "six", "seven", "eight", "nine"]
             found_number = None
-            
-            # Check for numeric words
             for label in food_labels:
                 if label in number_words:
                     found_number = number_words.index(label) + 1
                     break
-            
-            # Check for numeric digits
             if not found_number:
                 for label in food_labels:
                     if label.isdigit() and int(label) > 0 and int(label) < 10:
                         found_number = int(label)
                         break
-            
             if found_number:
-                # Replace generic "taco" with "{number} tacos"
-                detailed_food_labels = [label.replace("taco", f"{found_number} tacos") if "taco" in label else label 
-                                      for label in detailed_food_labels]
-        
-        # Handle special case for tacos
+                detailed_food_labels = [label.replace("taco", f"{found_number} tacos") if "taco" in label else label for label in detailed_food_labels]
         if "taco" in " ".join(food_labels).lower() and food_counts.get("taco", 0) > 1:
             taco_count = food_counts.get("taco", 0)
-            # Replace or add the detailed taco description
             taco_entry_found = False
             for i, label in enumerate(detailed_food_labels):
                 if "taco" in label.lower():
                     detailed_food_labels[i] = f"{taco_count} tacos"
                     taco_entry_found = True
                     break
-            
             if not taco_entry_found:
                 detailed_food_labels.append(f"{taco_count} tacos")
-                
-        # Log the detected food labels for debugging
+        candidates = []
+        for label in labels:
+            candidates.append({
+                "label": label.description.lower(),
+                "confidence": round(float(label.score) * 100, 1)  # percentage
+            })
         print(f"Basic food labels: {food_labels}")
         print(f"Detailed food labels: {detailed_food_labels}")
-                
-        return detailed_food_labels if detailed_food_labels else ["unidentified food"]
-        
+        print(f"Candidates: {candidates}")
+        return (detailed_food_labels if detailed_food_labels else ["unidentified food"], candidates)
     except Exception as e:
         print(f"Error in vision API: {e}")
-        # Raise exception instead of returning mock data
         raise Exception(f"Error processing image with Vision API: {e}")
 
 def generate_macro_summary(label, macros):
@@ -313,14 +272,9 @@ def generate_macro_summary(label, macros):
 @app.post("/api/analyze-image")
 async def analyze_image(file: UploadFile = File(...)):
     try:
-        # Read image file
         image_bytes = await file.read()
-        
         try:
-            # Detect food labels
-            food_labels = detect_food_labels(image_bytes)
-            
-            # Get macros for each food label
+            food_labels, candidates = detect_food_labels(image_bytes)
             macro_results = []
             for label in food_labels:
                 macros = get_macros_from_label(label)
@@ -329,8 +283,6 @@ async def analyze_image(file: UploadFile = File(...)):
                         "label": label,
                         "macros": macros
                     })
-                    
-            # If no macros found for any label, use the first label as a prompt for GPT
             if not macro_results and food_labels:
                 gpt_macros = generate_macro_summary(food_labels[0], None)
                 macro_results.append({
@@ -338,19 +290,15 @@ async def analyze_image(file: UploadFile = File(...)):
                     "macros": gpt_macros,
                     "source": "ai_estimated"
                 })
-                
-            return {"success": True, "results": macro_results}
-            
+            filtered_candidates = filter_candidates(candidates)
+            return {"success": True, "results": macro_results, "candidates": filtered_candidates}
         except Exception as e:
-            # Handle Vision API specific errors
             error_message = str(e)
             if "credentials" in error_message.lower():
                 return {"success": False, "error": "Google Vision API is not configured properly. Please check server credentials."}
             else:
                 return {"success": False, "error": f"Error analyzing food: {error_message}"}
-    
     except Exception as e:
-        # Handle general errors
         return {"success": False, "error": f"Error processing image: {str(e)}"}
 
 @app.post("/test-food-detection")
@@ -361,7 +309,7 @@ async def test_food_detection(file: UploadFile = File(...)):
     """
     try:
         contents = await file.read()
-        food_labels = detect_food_labels(contents)
+        food_labels, _ = detect_food_labels(contents)
         return {"detected_labels": food_labels}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error detecting food: {str(e)}")

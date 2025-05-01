@@ -9,109 +9,92 @@ A web application that analyzes food photos to identify the food and provide nut
 - Get nutritional information including calories, protein, carbs, and fat
 - Modern, responsive UI built with React and Tailwind CSS
 
-## Setup
+## Updated Setup for Easy Deployment
 
-### Prerequisites
+## Prerequisites
 
-- Python 3.9+ 
+- Python 3.9+
 - Node.js 18+
-- Google Cloud account with Vision API enabled
+- Google Cloud Vision API credentials (see below)
+- USDA FoodData Central API Key (free from https://fdc.nal.usda.gov/api-key-signup.html)
 
-### Google Cloud Vision API Setup
+## Quick Start
 
-1. Create a Google Cloud account and project at [console.cloud.google.com](https://console.cloud.google.com)
-2. Enable the Vision API for your project:
-   - Go to APIs & Services > Library
-   - Search for "Vision"
-   - Click on "Cloud Vision API"
-   - Click "Enable"
-3. Create a service account:
-   - Go to APIs & Services > Credentials
-   - Click "Create Credentials" > "Service Account"
-   - Enter a name and description
-   - Grant the role "Cloud Vision API User"
-   - Click "Done"
-4. Create and download a service account key:
-   - Find your service account in the list
-   - Click on the service account name
-   - Go to the "Keys" tab
-   - Click "Add Key" > "Create new key"
-   - Choose JSON format
-   - Click "Create" to download the key file
-5. Rename the downloaded file to `GCV_API.json`
-6. Place the file in one of these locations:
-   - Project root directory
-   - `photo-to-macros/credentials/` directory
+### 1. Clone the repository
+```sh
+git clone <your-repo-url>
+cd photo-macro-estimator/photo-to-macros
+```
 
-### Backend Setup
+### 2. Set up environment variables
 
-1. Create a virtual environment:
-   ```
-   python -m venv .venv
-   .venv\Scripts\activate  # Windows
-   source .venv/bin/activate  # macOS/Linux
-   ```
+- Create a file named `.env` in `photo-to-macros/` with this content:
+  ```
+  USDA_API_KEY=your_usda_api_key_here
+  ```
+  (Do NOT commit your API key to version control.)
 
-2. Install backend dependencies:
-   ```
-   cd photo-to-macros
-   pip install -r requirements.txt
-   ```
+- Place your Google Vision API JSON file as `credentials/GCV_API.json`.
 
-3. Run the backend server:
-   ```
-   python run_api.py
-   ```
+### 3. Backend Setup
+```sh
+python -m venv .venv
+.venv\Scripts\activate  # Windows
+# or
+source .venv/bin/activate  # macOS/Linux
+pip install -r requirements.txt
+uvicorn api.main:app --reload
+```
 
-### Frontend Setup
+### 4. Frontend Setup
+```sh
+cd frontend
+npm install
+npm run dev
+```
 
-1. Install frontend dependencies:
-   ```
-   cd photo-to-macros/frontend
-   npm install
-   ```
+- Open [http://localhost:5173](http://localhost:5173) in your browser.
 
-2. Start the development server:
-   ```
-   npm run dev
-   ```
+## Running the App
+- Start the backend with `uvicorn api.main:app --reload` from inside `photo-to-macros/`.
+- Start the frontend with `npm run dev` from inside `frontend/`.
 
-3. Open the application in your browser at `http://localhost:5173`
+## Environment Variables
+- `.env` must be in `photo-to-macros/` directory for the backend to detect your USDA API key.
+- Never commit `.env` or credential files to git.
 
-## Troubleshooting
+## Google Cloud Vision API Setup (Summary)
+1. Create a project on Google Cloud.
+2. Enable the Vision API.
+3. Create a service account with Vision API User role.
+4. Download the JSON key and save as `credentials/GCV_API.json`.
 
-### Google Vision API Credentials Issues
-
-If you encounter errors related to Google Vision API credentials:
-
-1. Make sure your Google Cloud project has:
-   - Vision API enabled
-   - Billing enabled
-   - The service account has proper permissions
-
-2. Try setting the credentials environment variable directly:
-   ```
-   # Windows
-   $env:GOOGLE_APPLICATION_CREDENTIALS="C:\path\to\your\GCV_API.json"
-   
-   # macOS/Linux
-   export GOOGLE_APPLICATION_CREDENTIALS="/path/to/your/GCV_API.json"
-   ```
+## USDA FoodData Central API Setup
+1. Sign up for a free API key at https://fdc.nal.usda.gov/api-key-signup.html
+2. Add it to your `.env` file as shown above.
 
 ## Project Structure
-
 ```
 photo-to-macros/
-├── api/                    # Backend API code
-│   ├── main.py             # FastAPI application
-│   ├── food_lookup.py      # Food database and nutritional info
-│   └── prompts.py          # Text generation templates
-├── credentials/            # Place for Google Cloud credentials
-├── frontend/               # React frontend
-│   ├── public/             # Static assets
-│   └── src/                # Source code
-│       ├── components/     # Reusable UI components
-│       ├── pages/          # Application pages/routes
-│       └── utils/          # Utility functions and API client
-└── run_api.py              # API server starter
+├── api/                # Backend FastAPI code
+├── credentials/        # Place Google credentials here
+├── frontend/           # React frontend
+├── .env                # Your USDA API key (not committed)
+├── requirements.txt    # Backend dependencies
+└── README.md
 ```
+
+## Troubleshooting
+- If you see `USDA_API_KEY not set in environment`, check that `.env` is in the right place and restart the backend.
+- If you see Google Vision API credential errors, check your service account JSON and path.
+
+## Security
+- Do NOT commit `.env` or credential files.
+- Example `.env` for sharing:
+  ```
+  USDA_API_KEY=your_usda_api_key_here
+  ```
+
+---
+
+This setup ensures anyone with the right API keys can run the app with minimal steps. For help, open an issue or see comments in the code.

@@ -1,4 +1,5 @@
 import re
+from .usda_lookup import get_usda_macros
 
 def get_macros_from_label(label):
     """
@@ -17,7 +18,22 @@ def get_macros_from_label(label):
         # Remove trailing 's' if it exists
         if base_label.endswith('s') and len(base_label) > 1:
             base_label = base_label[:-1]
-    
+    else:
+        base_label = base_label.strip()
+
+    # Try USDA API first
+    usda_macros = get_usda_macros(base_label)
+    if usda_macros:
+        # Scale macros by quantity if needed
+        usda_macros = usda_macros.copy()
+        if quantity > 1:
+            for k in ['calories', 'protein', 'carbs', 'fat']:
+                if k in usda_macros and isinstance(usda_macros[k], (int, float)):
+                    usda_macros[k] *= quantity
+        usda_macros['quantity'] = quantity
+        usda_macros['base_item'] = base_label
+        return usda_macros
+
     # If the label contains any of these words, use the first match
     compound_foods = {
         "pizza": ["pizza", "pepperoni", "cheese pizza", "slice"],
